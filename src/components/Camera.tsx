@@ -211,17 +211,18 @@ export default function PhotoBoothApp() {
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
-    const STRIP_WIDTH = 310;
-    const STRIP_HEIGHT = 1320;
-    const PHOTO_WIDTH = 270;
-    const PHOTO_HEIGHT = 380;
-    const MARGIN = 20;
+    // Fixed realistic dimensions (3:5 aspect ratio strip)
+    const STRIP_WIDTH = 270;
+    const PHOTO_HEIGHT = 300;
+    const PHOTO_WIDTH = 230;
     const PHOTO_SPACING = 20;
+    const MARGIN = 20;
+    const STRIP_HEIGHT = MARGIN * 2 + PHOTO_HEIGHT * 3 + PHOTO_SPACING * 2;
 
     canvas.width = STRIP_WIDTH;
     canvas.height = STRIP_HEIGHT;
 
-    // Background
+    // Background gradient
     const bg = ctx.createLinearGradient(0, 0, 0, STRIP_HEIGHT);
     bg.addColorStop(0, "#ffffff");
     bg.addColorStop(1, "#f8f9fa");
@@ -233,43 +234,55 @@ export default function PhotoBoothApp() {
     ctx.lineWidth = 2;
     ctx.strokeRect(1, 1, STRIP_WIDTH - 2, STRIP_HEIGHT - 2);
 
-    // Photos
+    // Draw all 3 photos after they finish loading
+    let imagesLoaded = 0;
+    const totalImages = capturedPhotos.length;
+
     capturedPhotos.forEach((photo, index) => {
       const img = new Image();
       img.onload = () => {
         const y = MARGIN + index * (PHOTO_HEIGHT + PHOTO_SPACING);
 
-        ctx.shadowColor = "rgba(0,0,0,0.1)";
+        // Draw white photo frame
+        ctx.shadowColor = "rgba(0,0,0,0.08)";
         ctx.shadowBlur = 6;
         ctx.shadowOffsetX = 2;
         ctx.shadowOffsetY = 2;
 
         ctx.fillStyle = "#fff";
         ctx.fillRect(MARGIN - 5, y - 5, PHOTO_WIDTH + 10, PHOTO_HEIGHT + 10);
+
+        // Draw photo
         ctx.drawImage(img, MARGIN, y, PHOTO_WIDTH, PHOTO_HEIGHT);
 
+        // Add border to photo
         ctx.shadowColor = "transparent";
         ctx.strokeStyle = "#ced4da";
         ctx.lineWidth = 1;
         ctx.strokeRect(MARGIN, y, PHOTO_WIDTH, PHOTO_HEIGHT);
+
+        imagesLoaded++;
+        if (imagesLoaded === totalImages) {
+          // Footer text after all images are drawn
+          ctx.fillStyle = "#495057";
+          ctx.font = "italic bold 16px Georgia, serif";
+          ctx.textAlign = "center";
+
+          const currentDate = new Date().toLocaleDateString("en-US", {
+            day: "numeric",
+            month: "long",
+            year: "numeric",
+          });
+
+          ctx.fillText(
+            `📸 Photobooth • ${currentDate}`,
+            STRIP_WIDTH / 2,
+            STRIP_HEIGHT - 20
+          );
+        }
       };
       img.src = photo.dataUrl;
     });
-
-    // Bottom title
-    ctx.fillStyle = "#495057";
-    ctx.font = "italic bold 18px Georgia, serif";
-    ctx.textAlign = "center";
-    const currentDate = new Date().toLocaleDateString("en-US", {
-      day: "numeric",
-      month: "long",
-      year: "numeric",
-    });
-    ctx.fillText(
-      `📸Photobooth • ${currentDate}`,
-      STRIP_WIDTH / 2,
-      STRIP_HEIGHT - 20
-    );
   }, [capturedPhotos, showPhotoStrip]);
 
   const downloadStrip = () => {
@@ -363,27 +376,29 @@ export default function PhotoBoothApp() {
         </div>
       ) : (
         // 🎞️ Photo Strip Section
-        <div className="flex flex-col md:flex-row gap-8 items-center bg-gradient-to-br from-amber-900 to-amber-800 rounded-3xl p-4 sm:p-8 max-w-3xl w-full shadow-xl">
-          <div className="bg-white p-3 rounded-2xl shadow-inner">
-            <canvas
-              ref={stripCanvasRef}
-              className="w-full max-w-[300px] md:max-w-[350px] aspect-[3/5] rounded-lg"
-            />
-          </div>
-
+        <div className="flex flex-col-reverse md:flex-row items-center gap-6 sm:gap-8 bg-gradient-to-br from-amber-950 to-amber-800 rounded-3xl p-4 sm:p-6 md:p-8 max-w-3xl w-full shadow-xl">
+          {/* Buttons - appear below image on small screens, right side on md+ */}
           <div className="flex flex-col gap-4 w-full md:w-auto items-center">
             <button
               onClick={reset}
-              className="bg-amber-700 hover:bg-amber-600 text-white px-6 py-3 text-sm sm:text-base font-semibold rounded-xl shadow-md w-full"
+              className="w-full md:w-auto bg-white text-amber-900 hover:bg-gray-100 px-6 py-3 text-sm sm:text-base font-bold rounded-xl shadow-md transition-all"
             >
-              Re-Shoot
+              🔄 Re-Shoot
             </button>
             <button
               onClick={downloadStrip}
-              className="bg-amber-700 hover:bg-amber-600 text-white px-6 py-3 text-sm sm:text-base font-semibold rounded-xl shadow-md w-full"
+              className="w-full md:w-auto bg-yellow-500 text-black hover:bg-yellow-400 px-6 py-3 text-sm sm:text-base font-bold rounded-xl shadow-md transition-all"
             >
-              Download Photo
+              📥 Download Photo
             </button>
+          </div>
+
+          {/* Canvas strip - appears on top in mobile, left in md+ */}
+          <div className="w-full max-w-[260px] sm:max-w-[300px] md:max-w-[330px] aspect-[3/5]">
+            <canvas
+              ref={stripCanvasRef}
+              className="w-full h-auto rounded-xl shadow-lg border border-gray-300"
+            />
           </div>
         </div>
       )}
