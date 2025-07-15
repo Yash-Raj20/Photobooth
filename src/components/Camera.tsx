@@ -206,11 +206,11 @@ export default function PhotoBoothApp() {
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
-    const STRIP_WIDTH = 320;
-    const STRIP_HEIGHT = 700;
+    const STRIP_WIDTH = 310;
+    const STRIP_HEIGHT = 1020;
     const PHOTO_WIDTH = 270;
-    const PHOTO_HEIGHT = 200;
-    const MARGIN = 25;
+    const PHOTO_HEIGHT = 300;
+    const MARGIN = 20;
     const PHOTO_SPACING = 20;
 
     canvas.width = STRIP_WIDTH;
@@ -282,110 +282,109 @@ export default function PhotoBoothApp() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center px-4 py-6">
-      {!showPhotoStrip ? (
-        <div className="bg-white rounded-xl shadow-xl p-4 w-full max-w-3xl space-y-4">
-          {/* Video Preview */}
-          <div className="w-full h-64 sm:h-80 md:h-[26rem] lg:h-[30rem] relative overflow-hidden rounded-lg mx-auto">
-            <video
-              ref={videoRef}
-              className="w-full h-full object-cover"
-              muted
-              playsInline
-              style={{
-                filter: FILTERS.find((f) => f.name === currentFilter)?.css,
-                transform: "scaleX(-1)",
-              }}
-            />
-            {countdown && (
-              <div className="absolute inset-0 bg-black bg-opacity-60 flex items-center justify-center text-white text-5xl font-bold animate-pulse">
-                {countdown}
-              </div>
-            )}
-            {capturedPhotos.length > 0 && (
-              <span className="absolute top-2 right-2 bg-yellow-400 text-black px-3 py-1 rounded-full text-xs font-bold">
-                {capturedPhotos.length}/3
-              </span>
-            )}
+    <div className="min-h-screen w-full flex flex-col items-center justify-between px-2 py-4 sm:px-4 sm:py-6 bg-base-100">
+  {!showPhotoStrip ? (
+    <div className="w-full max-w-5xl flex flex-col sm:rounded-2xl sm:shadow-xl bg-white sm:p-4 space-y-4 rounded-xl">
+      {/* 📸 Camera Preview */}
+      <div className="relative w-full h-[calc(100vh-300px)] sm:h-[30rem] overflow-hidden rounded-xl bg-black">
+        <video
+          ref={videoRef}
+          className="w-full h-full object-cover"
+          muted
+          playsInline
+          style={{
+            filter: FILTERS.find((f) => f.name === currentFilter)?.css,
+            transform: facingMode === "front" ? "scaleX(-1)" : "scaleX(1)",
+          }}
+        />
+        {countdown && (
+          <div className="absolute inset-0 bg-black bg-opacity-60 flex items-center justify-center text-white text-5xl font-bold animate-pulse z-10">
+            {countdown}
           </div>
+        )}
+        {capturedPhotos.length > 0 && (
+          <span className="absolute top-3 right-3 bg-yellow-400 text-black px-3 py-1 rounded-full text-xs font-bold z-10">
+            {capturedPhotos.length}/3
+          </span>
+        )}
+      </div>
 
-          {/* Filters */}
-          <div className="flex gap-2 overflow-x-auto scrollbar-hide py-2">
-            {FILTERS.map((filter) => (
-              <button
-                key={filter.name}
-                onClick={() => setCurrentFilter(filter.name)}
-                className={`px-3 py-1 rounded-full text-xs sm:text-sm whitespace-nowrap transition ${
-                  currentFilter === filter.name
-                    ? "bg-yellow-500 text-black font-semibold"
-                    : "bg-gray-200 hover:bg-gray-300 text-gray-700"
-                }`}
-              >
-                {filter.label}
-              </button>
-            ))}
-          </div>
+      {/* 🎨 Filters */}
+      <div className="flex gap-2 overflow-x-auto scrollbar-hide px-1 sm:px-2 pb-2">
+        {FILTERS.map((filter) => (
+          <button
+            key={filter.name}
+            onClick={() => setCurrentFilter(filter.name)}
+            className={`px-4 py-1 rounded-full text-xs sm:text-sm whitespace-nowrap transition ${
+              currentFilter === filter.name
+                ? "bg-yellow-500 text-black font-semibold"
+                : "bg-gray-200 hover:bg-gray-300 text-gray-700"
+            }`}
+          >
+            {filter.label}
+          </button>
+        ))}
+      </div>
 
-          {/* Capture Button */}
-          <div className="flex justify-center gap-10 items-center">
-            <button
-              onClick={handleCapture}
-              disabled={isCapturing || capturedPhotos.length >= 5}
-              className="w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-yellow-500 hover:bg-yellow-600 text-black shadow-md disabled:opacity-50 flex items-center justify-center"
-            >
-              <FaCamera className="w-6 h-6" />
-              <span className="sr-only">Take Photo</span>
-            </button>
-            <button
-              onClick={() =>
-                setFacingMode((prev) => (prev === "front" ? "rear" : "front"))
-              }
-              className="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-gray-200 text-black text-sm shadow hover:bg-gray-400 flex items-center justify-center transition"
-              title="Switch Camera"
-            >
-              <MdOutlineCameraswitch className="w-6 h-6" />
-              <span className="sr-only">Switch Camera</span>
-            </button>
-          </div>
+      {/* 📸 Capture + Switch Buttons */}
+      <div className="flex justify-center items-center ml-10 gap-4">
+        <button
+          onClick={handleCapture}
+          disabled={isCapturing || capturedPhotos.length >= 3}
+          className="w-16 h-16 rounded-full bg-yellow-500 hover:bg-yellow-600 text-black shadow-md disabled:opacity-50 flex items-center justify-center"
+          title="Click Photo"
+        >
+          <FaCamera className="w-6 h-6" />
+        </button>
+        <button
+          onClick={() =>
+            setFacingMode((prev) => (prev === "front" ? "rear" : "front"))
+          }
+          className="w-10 h-10 rounded-full bg-gray-200 text-black shadow hover:bg-gray-300 flex items-center justify-center"
+          title="Switch camera"
+          aria-label="Switch camera"
+        >
+          <MdOutlineCameraswitch className="w-6 h-6" />
+        </button>
+      </div>
 
-          {/* Status Text */}
-          <p className="text-center text-sm text-gray-700">
-            {capturedPhotos.length === 0 && "Ready to click your first snap!"}
-            {capturedPhotos.length === 1 && "Great! Click 3 more photos"}
-            {capturedPhotos.length === 2 && "One last snap!"}
-            {capturedPhotos.length === 3 && "All done! Generating collage..."}
-          </p>
-        </div>
-      ) : (
-        <div className="flex flex-col md:flex-row gap-8 md:gap-10 items-center bg-gradient-to-br from-amber-900 to-amber-800 rounded-3xl p-6 md:p-8 w-full max-w-3xl shadow-2xl border-0">
-          {/* Canvas Strip */}
-          <div className="flex justify-center md:justify-start w-full md:w-auto">
-            <div className="bg-white p-3 md:p-4 rounded-2xl shadow-2xl transform rotate-1 hover:rotate-0 transition-transform duration-300">
-              <canvas
-                ref={stripCanvasRef}
-                className="w-full max-w-[260px] md:max-w-[300px] h-auto aspect-[2/3] rounded-lg shadow-inner"
-              />
-            </div>
-          </div>
-
-          {/* Buttons */}
-          <div className="flex flex-col gap-4 w-full md:w-auto items-center">
-            <button
-              onClick={reset}
-              className="bg-amber-700 hover:bg-amber-600 text-white px-6 md:px-8 py-3 md:py-4 text-base md:text-lg font-bold rounded-xl shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-200 border-2 border-amber-600 w-full md:w-auto"
-            >
-              Re-Shoot
-            </button>
-            <button
-              onClick={downloadStrip}
-              className="bg-amber-700 hover:bg-amber-600 text-white px-6 md:px-8 py-3 md:py-4 text-base md:text-lg font-bold rounded-xl shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-200 border-2 border-amber-600 w-full md:w-auto"
-            >
-              Download Photo
-            </button>
-          </div>
-        </div>
-      )}
-      <canvas ref={canvasRef} className="hidden" />
+      {/* 📝 Status */}
+      <p className="text-center text-sm text-gray-700">
+        {capturedPhotos.length === 0 && "Ready to click your first snap!"}
+        {capturedPhotos.length === 1 && "2 more to go!"}
+        {capturedPhotos.length === 2 && "One last snap!"}
+        {capturedPhotos.length === 3 && "All done! Generating collage..."}
+      </p>
     </div>
+  ) : (
+    // 🎞️ Photo Strip Section
+    <div className="flex flex-col md:flex-row gap-8 items-center bg-gradient-to-br from-amber-900 to-amber-800 rounded-3xl p-4 sm:p-8 max-w-3xl w-full shadow-xl">
+      <div className="bg-white p-3 rounded-2xl shadow-inner">
+        <canvas
+          ref={stripCanvasRef}
+          className="w-full max-w-[300px] md:max-w-[350px] aspect-[2/3] rounded-lg"
+        />
+      </div>
+
+      <div className="flex flex-col gap-4 w-full md:w-auto items-center">
+        <button
+          onClick={reset}
+          className="bg-amber-700 hover:bg-amber-600 text-white px-6 py-3 text-sm sm:text-base font-semibold rounded-xl shadow-md w-full"
+        >
+          Re-Shoot
+        </button>
+        <button
+          onClick={downloadStrip}
+          className="bg-amber-700 hover:bg-amber-600 text-white px-6 py-3 text-sm sm:text-base font-semibold rounded-xl shadow-md w-full"
+        >
+          Download Photo
+        </button>
+      </div>
+    </div>
+  )}
+
+  <canvas ref={canvasRef} className="hidden" />
+</div>
+
   );
 }
