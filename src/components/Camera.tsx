@@ -2,15 +2,26 @@
 
 import { useState, useRef, useEffect, useCallback } from "react";
 import { FaCamera } from "react-icons/fa";
+import { MdOutlineCameraswitch } from "react-icons/md";
 
 type FilterType =
   | "90s"
   | "2000s"
   | "Noir"
-  | "Fisheye"
-  | "Rainbow"
-  | "Glitch"
-  | "Crosshatch";
+  | "clarendon"
+  | "gingham"
+  | "moon"
+  | "lark"
+  | "reyes"
+  | "juno"
+  | "valencia"
+  | "slumber"
+  | "noir"
+  | "sunset"
+  | "vintage"
+  | "cooltone"
+  | "warmglow"
+  | "bwfilm";
 
 interface CapturedPhoto {
   dataUrl: string;
@@ -29,25 +40,74 @@ const FILTERS: { name: FilterType; label: string; css: string }[] = [
     css: "saturate(1.6) contrast(1.2) brightness(1.1) hue-rotate(10deg)",
   },
   {
-    name: "Noir",
+    name: "clarendon",
+    label: "Clarendon",
+    css: "contrast(1.2) saturate(1.35) brightness(1.05)",
+  },
+  {
+    name: "gingham",
+    label: "Gingham",
+    css: "brightness(1.1) contrast(0.95) sepia(0.04)",
+  },
+  {
+    name: "moon",
+    label: "Moon",
+    css: "grayscale(1) contrast(1.1) brightness(1.1)",
+  },
+  {
+    name: "lark",
+    label: "Lark",
+    css: "brightness(1.2) contrast(1.05) saturate(1.15)",
+  },
+  {
+    name: "reyes",
+    label: "Reyes",
+    css: "brightness(1.1) sepia(0.22) contrast(0.85)",
+  },
+  {
+    name: "juno",
+    label: "Juno",
+    css: "saturate(1.4) contrast(1.15) brightness(1.05)",
+  },
+  {
+    name: "valencia",
+    label: "Valencia",
+    css: "sepia(0.2) contrast(1.1) brightness(1.08)",
+  },
+  {
+    name: "slumber",
+    label: "Slumber",
+    css: "brightness(1.05) saturate(0.85) sepia(0.1)",
+  },
+  {
+    name: "noir",
     label: "Noir",
     css: "grayscale(1) contrast(1.3) brightness(0.9)",
   },
-  { name: "Fisheye", label: "Fisheye", css: "contrast(1.2) saturate(1.3)" },
   {
-    name: "Rainbow",
-    label: "Rainbow",
-    css: "hue-rotate(180deg) saturate(2) brightness(1.2)",
+    name: "sunset",
+    label: "Sunset",
+    css: "hue-rotate(-15deg) saturate(1.3) brightness(1.1)",
   },
   {
-    name: "Glitch",
-    label: "Glitch",
-    css: "hue-rotate(90deg) saturate(2) contrast(1.5)",
+    name: "vintage",
+    label: "Vintage",
+    css: "sepia(0.6) saturate(0.8) contrast(1.05)",
   },
   {
-    name: "Crosshatch",
-    label: "Crosshatch",
-    css: "contrast(1.4) brightness(0.8) saturate(0.8)",
+    name: "cooltone",
+    label: "Cool Tone",
+    css: "hue-rotate(200deg) saturate(1.1) brightness(1.1)",
+  },
+  {
+    name: "warmglow",
+    label: "Warm Glow",
+    css: "hue-rotate(-20deg) saturate(1.2) brightness(1.05)",
+  },
+  {
+    name: "bwfilm",
+    label: "B&W Film",
+    css: "grayscale(1) contrast(1.2) brightness(1.05)",
   },
 ];
 
@@ -58,6 +118,7 @@ export default function PhotoBoothApp() {
   const [capturedPhotos, setCapturedPhotos] = useState<CapturedPhoto[]>([]);
   const [currentFilter, setCurrentFilter] = useState<FilterType>("2000s");
   const [showPhotoStrip, setShowPhotoStrip] = useState(false);
+  const [facingMode, setFacingMode] = useState<"front" | "rear">("front");
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -66,7 +127,7 @@ export default function PhotoBoothApp() {
   const getCamera = useCallback(async () => {
     try {
       const mediaStream = await navigator.mediaDevices.getUserMedia({
-        video: true,
+        video: { facingMode },
       });
       setStream(mediaStream);
       if (videoRef.current) {
@@ -77,7 +138,7 @@ export default function PhotoBoothApp() {
       console.error("Camera access error:", err);
       alert("📸 Please allow camera permission to use the PhotoBooth.");
     }
-  }, []);
+  }, [facingMode]);
 
   useEffect(() => {
     getCamera();
@@ -258,7 +319,7 @@ export default function PhotoBoothApp() {
           </div>
 
           {/* Capture Button */}
-          <div className="flex justify-center">
+          <div className="flex justify-center gap-10 items-center">
             <button
               onClick={handleCapture}
               disabled={isCapturing || capturedPhotos.length >= 5}
@@ -266,6 +327,16 @@ export default function PhotoBoothApp() {
             >
               <FaCamera className="w-6 h-6" />
               <span className="sr-only">Take Photo</span>
+            </button>
+            <button
+              onClick={() =>
+                setFacingMode((prev) => (prev === "front" ? "rear" : "front"))
+              }
+              className="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-gray-200 text-black text-sm shadow hover:bg-gray-400 flex items-center justify-center transition"
+              title="Switch Camera"
+            >
+              <MdOutlineCameraswitch className="w-6 h-6" />
+              <span className="sr-only">Switch Camera</span>
             </button>
           </div>
 
@@ -284,7 +355,7 @@ export default function PhotoBoothApp() {
             <div className="bg-white p-3 md:p-4 rounded-2xl shadow-2xl transform rotate-1 hover:rotate-0 transition-transform duration-300">
               <canvas
                 ref={stripCanvasRef}
-                className="w-full max-w-[260px] md:max-w-[300px] h-auto rounded-lg shadow-inner"
+                className="w-full max-w-[260px] md:max-w-[300px] h-auto aspect-[2/3] rounded-lg shadow-inner"
               />
             </div>
           </div>
