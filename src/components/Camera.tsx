@@ -124,12 +124,20 @@ export default function PhotoBoothApp() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const stripCanvasRef = useRef<HTMLCanvasElement>(null);
 
+  // ✅ Get Camera Function
   const getCamera = useCallback(async () => {
     try {
+      stream?.getTracks().forEach((track) => track.stop());
+
       const mediaStream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode },
+        video: {
+          facingMode: facingMode === "front" ? "user" : "environment",
+        },
+        audio: false,
       });
+
       setStream(mediaStream);
+
       if (videoRef.current) {
         videoRef.current.srcObject = mediaStream;
         await videoRef.current.play();
