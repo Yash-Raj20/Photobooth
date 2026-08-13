@@ -3,22 +3,18 @@ import Camera from "@/components/Camera";
 
 export default function CameraPage() {
   return (
-    <div className="min-h-screen bg-base-100 text-base-content px-4 py-5">
-      <div className="max-w-5xl mx-auto">
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
-          <h1 className="text-3xl sm:text-4xl font-bold flex items-center gap-2">
-            📸 Camera Booth
+    <div className="flex flex-col w-full min-h-[calc(100vh-6rem)] pt-12 pb-2">
+      <div className="w-full mb-4 text-center md:text-left flex flex-col md:flex-row md:justify-between md:items-end gap-2 shrink-0">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight mb-1">
+            Camera Studio
           </h1>
-          <p className="text-sm text-gray-500 dark:text-gray-400">
-            Capture your photos with fun filters and create a strip!
-          </p>
-        </div>
 
-        <div className="divider" />
-
-        <div className="bg-base-200 rounded-2xl shadow-md">
-          <Camera />
         </div>
+      </div>
+
+      <div className="w-full flex-1 flex flex-col">
+        <Camera />
       </div>
     </div>
   );

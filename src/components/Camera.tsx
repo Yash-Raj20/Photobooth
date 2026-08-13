@@ -111,14 +111,33 @@ const FILTERS: { name: FilterType; label: string; css: string }[] = [
   },
 ];
 
+// 🎵 Real Camera Shutter Sound
+const playCameraSound = () => {
+  try {
+    const audio = new Audio('/shutter.mp3');
+    audio.play().catch((e) => console.error("Audio playback failed:", e));
+  } catch (e) {
+    console.error("Audio API not supported", e);
+  }
+};
+
 export default function PhotoBoothApp() {
-  const [stream, setStream] = useState<MediaStream | null>(null);
+  // stream state removed
   const [isCapturing, setIsCapturing] = useState(false);
   const [countdown, setCountdown] = useState<string | null>(null);
   const [capturedPhotos, setCapturedPhotos] = useState<CapturedPhoto[]>([]);
   const [currentFilter, setCurrentFilter] = useState<FilterType>("2000s");
   const [showPhotoStrip, setShowPhotoStrip] = useState(false);
   const [facingMode, setFacingMode] = useState<"front" | "rear">("front");
+  const [cameraError, setCameraError] = useState<string | null>(null);
+  const [isCameraActive, setIsCameraActive] = useState(false);
+  const [totalPhotosCount, setTotalPhotosCount] = useState<number>(3);
+  const [layoutStyle, setLayoutStyle] = useState<"strip" | "grid">("strip");
+
+  const handleCountChange = (num: number) => {
+    setTotalPhotosCount(num);
+    if (num === 1 || num === 3) setLayoutStyle("strip");
+  };
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -127,7 +146,11 @@ export default function PhotoBoothApp() {
   // ✅ Get Camera Function
   const getCamera = useCallback(async () => {
     try {
-      stream?.getTracks().forEach((track) => track.stop());
+      setCameraError(null);
+      if (videoRef.current && videoRef.current.srcObject) {
+        const oldStream = videoRef.current.srcObject as MediaStream;
+        oldStream.getTracks().forEach((track) => track.stop());
+      }
 
       const mediaStream = await navigator.mediaDevices.getUserMedia({
         video: {
@@ -136,7 +159,7 @@ export default function PhotoBoothApp() {
         audio: false,
       });
 
-      setStream(mediaStream);
+      // setStream(mediaStream); removed
 
       if (videoRef.current) {
         videoRef.current.srcObject = mediaStream;
@@ -144,26 +167,48 @@ export default function PhotoBoothApp() {
       }
     } catch (err) {
       console.error("Camera access error:", err);
-      alert("📸 Please allow camera permission to use the PhotoBooth.");
+      let errorMsg = "Please allow camera permission in your browser to use the PhotoBooth.";
+      if (err instanceof Error || (err && typeof err === 'object' && 'name' in err)) {
+        const errName = (err as Error).name;
+        if (errName === 'NotAllowedError') {
+          errorMsg = "Permission denied. Please click the 🔒 lock icon in your browser's address bar to allow camera access.";
+        } else if (errName === 'NotFoundError') {
+          errorMsg = "No camera device found on your system. Please connect a camera.";
+        } else if (errName === 'NotReadableError') {
+          errorMsg = "Camera is already in use by another app or browser tab. Please close it first.";
+        }
+      }
+      setCameraError(errorMsg);
+      setIsCameraActive(false);
     }
   }, [facingMode]);
 
   useEffect(() => {
-    getCamera();
+    const videoElement = videoRef.current;
     return () => {
-      stream?.getTracks().forEach((track) => track.stop());
+      if (videoElement && videoElement.srcObject) {
+        const oldStream = videoElement.srcObject as MediaStream;
+        oldStream.getTracks().forEach((track) => track.stop());
+      }
     };
-  }, [getCamera]);
+  }, []);
 
   const handleCapture = async () => {
-    if (isCapturing || capturedPhotos.length >= 5) return;
+    if (isCapturing || capturedPhotos.length >= totalPhotosCount) return;
     setIsCapturing(true);
 
-    const steps = ["3", "2", "1", "Smile!"];
+    const steps = [
+      { text: "Ready?", delay: 1000 },
+      { text: "Smile!", delay: 800 }
+    ];
+    
     for (const step of steps) {
-      setCountdown(step);
-      await new Promise((r) => setTimeout(r, 1000));
+      setCountdown(step.text);
+      await new Promise((r) => setTimeout(r, step.delay));
     }
+    
+    // Play shutter sound & hide text right before capturing
+    playCameraSound();
     setCountdown(null);
 
     if (videoRef.current && canvasRef.current) {
@@ -183,13 +228,13 @@ export default function PhotoBoothApp() {
         }
         ctx.restore();
 
-        const dataUrl = canvasRef.current.toDataURL("image/jpeg", 0.9);
+        const dataUrl = canvasRef.current.toDataURL("image/png");
         setCapturedPhotos((prev) => [
           ...prev,
           { dataUrl, timestamp: Date.now() },
         ]);
 
-        if (capturedPhotos.length + 1 === 3) {
+        if (capturedPhotos.length + 1 === totalPhotosCount) {
           setTimeout(() => setShowPhotoStrip(true), 500);
         }
       }
@@ -198,11 +243,11 @@ export default function PhotoBoothApp() {
     setIsCapturing(false);
   };
 
-  // 🎞️ Render final strip with 3 photos
+  // 🎞️ Render final strip
   useEffect(() => {
     if (
       !showPhotoStrip ||
-      capturedPhotos.length !== 3 ||
+      capturedPhotos.length !== totalPhotosCount ||
       !stripCanvasRef.current
     )
       return;
@@ -211,13 +256,62 @@ export default function PhotoBoothApp() {
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
-    // Fixed realistic dimensions (3:5 aspect ratio strip)
-    const STRIP_WIDTH = 270;
-    const PHOTO_HEIGHT = 300;
-    const PHOTO_WIDTH = 230;
-    const PHOTO_SPACING = 20;
-    const MARGIN = 20;
-    const STRIP_HEIGHT = MARGIN * 2 + PHOTO_HEIGHT * 3 + PHOTO_SPACING * 2;
+    // Draw photos properly without stretching
+    const drawImageCover = (ctx: CanvasRenderingContext2D, img: HTMLImageElement, x: number, y: number, w: number, h: number) => {
+      const imgRatio = img.width / img.height;
+      const targetRatio = w / h;
+      let sx, sy, sw, sh;
+      
+      if (imgRatio > targetRatio) {
+        sh = img.height;
+        sw = img.height * targetRatio;
+        sx = (img.width - sw) / 2;
+        sy = 0;
+      } else {
+        sw = img.width;
+        sh = img.width / targetRatio;
+        sx = 0;
+        sy = (img.height - sh) / 2;
+      }
+      ctx.drawImage(img, sx, sy, sw, sh, x, y, w, h);
+    };
+
+    // High resolution constants (Match standard 4:3 camera aspect ratio to avoid aggressive cropping)
+    const scale = layoutStyle === "strip" ? 2 : 1; // Double resolution for strip to prevent small download appearance
+    const MARGIN = 40 * scale;
+    const SPACING = 30 * scale;
+    const PHOTO_W = 800 * scale;
+    const PHOTO_H = 600 * scale; // 4:3 aspect ratio
+    const FOOTER_HEIGHT = 120 * scale;
+    
+    let STRIP_WIDTH = 0;
+    let STRIP_HEIGHT = 0;
+    const photoPositions: {x: number, y: number}[] = [];
+
+    if (layoutStyle === "grid" && (totalPhotosCount === 4 || totalPhotosCount === 2)) {
+      if (totalPhotosCount === 4) {
+        // 2x2 Grid
+        STRIP_WIDTH = MARGIN * 2 + PHOTO_W * 2 + SPACING;
+        STRIP_HEIGHT = MARGIN * 2 + PHOTO_H * 2 + SPACING + FOOTER_HEIGHT;
+        photoPositions.push({x: MARGIN, y: MARGIN});
+        photoPositions.push({x: MARGIN + PHOTO_W + SPACING, y: MARGIN});
+        photoPositions.push({x: MARGIN, y: MARGIN + PHOTO_H + SPACING});
+        photoPositions.push({x: MARGIN + PHOTO_W + SPACING, y: MARGIN + PHOTO_H + SPACING});
+      } else {
+        // 2x1 Horizontal Grid
+        STRIP_WIDTH = MARGIN * 2 + PHOTO_W * 2 + SPACING;
+        STRIP_HEIGHT = MARGIN * 2 + PHOTO_H + FOOTER_HEIGHT;
+        photoPositions.push({x: MARGIN, y: MARGIN});
+        photoPositions.push({x: MARGIN + PHOTO_W + SPACING, y: MARGIN});
+      }
+    } else {
+      // Vertical Strip
+      STRIP_WIDTH = MARGIN * 2 + PHOTO_W;
+      STRIP_HEIGHT = MARGIN * 2 + (PHOTO_H * totalPhotosCount) + (SPACING * Math.max(0, totalPhotosCount - 1)) + FOOTER_HEIGHT;
+      for (let i = 0; i < totalPhotosCount; i++) {
+        photoPositions.push({ x: MARGIN, y: MARGIN + i * (PHOTO_H + SPACING) });
+      }
+    }
 
     canvas.width = STRIP_WIDTH;
     canvas.height = STRIP_HEIGHT;
@@ -225,181 +319,286 @@ export default function PhotoBoothApp() {
     // Background gradient
     const bg = ctx.createLinearGradient(0, 0, 0, STRIP_HEIGHT);
     bg.addColorStop(0, "#ffffff");
-    bg.addColorStop(1, "#f8f9fa");
+    bg.addColorStop(1, "#f1f5f9");
     ctx.fillStyle = bg;
     ctx.fillRect(0, 0, STRIP_WIDTH, STRIP_HEIGHT);
 
     // Border
-    ctx.strokeStyle = "#e2e8f0";
-    ctx.lineWidth = 2;
-    ctx.strokeRect(1, 1, STRIP_WIDTH - 2, STRIP_HEIGHT - 2);
+    ctx.strokeStyle = "#cbd5e1";
+    ctx.lineWidth = 4 * scale;
+    ctx.strokeRect(2 * scale, 2 * scale, STRIP_WIDTH - (4 * scale), STRIP_HEIGHT - (4 * scale));
 
-    // Draw all 3 photos after they finish loading
+    // Draw all photos
     let imagesLoaded = 0;
     const totalImages = capturedPhotos.length;
 
     capturedPhotos.forEach((photo, index) => {
       const img = new Image();
       img.onload = () => {
-        const y = MARGIN + index * (PHOTO_HEIGHT + PHOTO_SPACING);
+        const pos = photoPositions[index];
+        if (!pos) return;
 
         // Draw white photo frame
-        ctx.shadowColor = "rgba(0,0,0,0.08)";
-        ctx.shadowBlur = 6;
-        ctx.shadowOffsetX = 2;
-        ctx.shadowOffsetY = 2;
-
+        ctx.shadowColor = "rgba(0,0,0,0.12)";
+        ctx.shadowBlur = 15 * scale;
+        ctx.shadowOffsetX = 4 * scale;
+        ctx.shadowOffsetY = 8 * scale;
         ctx.fillStyle = "#fff";
-        ctx.fillRect(MARGIN - 5, y - 5, PHOTO_WIDTH + 10, PHOTO_HEIGHT + 10);
+        ctx.fillRect(pos.x - (10 * scale), pos.y - (10 * scale), PHOTO_W + (20 * scale), PHOTO_H + (20 * scale));
 
-        // Draw photo
-        ctx.drawImage(img, MARGIN, y, PHOTO_WIDTH, PHOTO_HEIGHT);
-
-        // Add border to photo
+        // Draw photo with object-cover scaling (NO STRETCHING)
         ctx.shadowColor = "transparent";
-        ctx.strokeStyle = "#ced4da";
-        ctx.lineWidth = 1;
-        ctx.strokeRect(MARGIN, y, PHOTO_WIDTH, PHOTO_HEIGHT);
+        drawImageCover(ctx, img, pos.x, pos.y, PHOTO_W, PHOTO_H);
+
+        // Add inner border to photo
+        ctx.strokeStyle = "#e2e8f0";
+        ctx.lineWidth = 2 * scale;
+        ctx.strokeRect(pos.x, pos.y, PHOTO_W, PHOTO_H);
 
         imagesLoaded++;
         if (imagesLoaded === totalImages) {
-          // Footer text after all images are drawn
-          ctx.fillStyle = "#495057";
-          ctx.font = "italic bold 16px Georgia, serif";
+          // Footer text
+          ctx.fillStyle = "#334155";
+          ctx.font = `italic bold ${42 * scale}px Georgia, serif`;
           ctx.textAlign = "center";
-
+          
           const currentDate = new Date().toLocaleDateString("en-US", {
-            day: "numeric",
-            month: "long",
-            year: "numeric",
+            day: "numeric", month: "long", year: "numeric",
           });
 
           ctx.fillText(
             `📸 Photobooth • ${currentDate}`,
             STRIP_WIDTH / 2,
-            STRIP_HEIGHT - 20
+            STRIP_HEIGHT - (45 * scale)
           );
         }
       };
       img.src = photo.dataUrl;
     });
-  }, [capturedPhotos, showPhotoStrip]);
+  }, [capturedPhotos, showPhotoStrip, layoutStyle, totalPhotosCount]);
 
   const downloadStrip = () => {
     if (!stripCanvasRef.current) return;
     const link = document.createElement("a");
-    link.href = stripCanvasRef.current.toDataURL("image/jpeg", 0.9);
-    link.download = "photo-booth.jpg";
+    link.href = stripCanvasRef.current.toDataURL("image/png");
+    link.download = "photo-booth.png";
     link.click();
   };
 
   const reset = async () => {
     setCapturedPhotos([]);
     setShowPhotoStrip(false);
-    await getCamera();
+    setIsCameraActive(false);
   };
 
   return (
-    <div className="min-h-screen w-full flex flex-col items-center justify-between px-2 py-4 sm:px-4 sm:py-6 bg-base-100">
+    <div className="w-full flex-1 flex flex-col items-center pb-2">
       {!showPhotoStrip ? (
-        <div className="w-full max-w-5xl flex flex-col sm:rounded-2xl sm:shadow-xl bg-white sm:p-4 space-y-4 rounded-xl">
-          {/* 📸 Camera Preview */}
-          <div className="relative w-full h-[calc(100vh-300px)] sm:h-[30rem] overflow-hidden rounded-xl bg-black">
-            <video
-              ref={videoRef}
-              className="w-full h-full object-cover"
-              muted
-              playsInline
-              style={{
-                filter: FILTERS.find((f) => f.name === currentFilter)?.css,
-                transform: facingMode === "front" ? "scaleX(-1)" : "scaleX(1)",
-              }}
-            />
-            {countdown && (
-              <div className="absolute inset-0 bg-black bg-opacity-60 flex items-center justify-center text-white text-5xl font-bold animate-pulse z-10">
-                {countdown}
+        <div className="w-full flex-1 flex flex-col space-y-4 justify-between">
+          {/* 📸 Camera Preview (Responsive constraints) */}
+          <div className="relative w-full aspect-[3/4] sm:aspect-[4/3] md:aspect-video max-h-[60vh] md:max-h-[70vh] mx-auto overflow-hidden rounded-2xl bg-black border border-base-200 shadow-lg flex items-center justify-center group">
+            {!isCameraActive && !cameraError ? (
+              <div className="absolute inset-0 bg-base-300 flex flex-col items-center justify-center p-6 text-center z-30">
+                <div className="w-20 h-20 rounded-full bg-primary/20 text-primary flex items-center justify-center mb-6">
+                  <FaCamera className="w-10 h-10" />
+                </div>
+                <h3 className="text-2xl font-bold mb-2 tracking-tight">Ready to Snap?</h3>
+                <p className="text-base-content/70 mb-8 max-w-sm">
+                  We need your permission to use the camera for the PhotoBooth.
+                </p>
+                <button 
+                  onClick={() => {
+                    setIsCameraActive(true);
+                    getCamera();
+                  }} 
+                  className="btn btn-primary rounded-full px-10 h-12 text-lg shadow-lg hover:shadow-xl hover:scale-105 transition-all"
+                >
+                  Enable Camera
+                </button>
               </div>
+            ) : cameraError ? (
+              <div className="absolute inset-0 bg-base-300 flex flex-col items-center justify-center p-6 text-center z-30">
+                <div className="w-16 h-16 rounded-full bg-error/20 text-error flex items-center justify-center mb-4">
+                  <FaCamera className="w-8 h-8 opacity-50" />
+                </div>
+                <h3 className="text-xl font-bold mb-2">Camera Access Denied</h3>
+                <p className="text-base-content/70">{cameraError}</p>
+                <button 
+                  onClick={getCamera} 
+                  className="btn btn-outline btn-sm mt-6 rounded-full px-6"
+                >
+                  Try Again
+                </button>
+              </div>
+            ) : (
+              <>
+                <video
+                  ref={videoRef}
+                  className="w-full h-full object-cover"
+                  muted
+                  playsInline
+                  style={{
+                    filter: FILTERS.find((f) => f.name === currentFilter)?.css,
+                    transform: facingMode === "front" ? "scaleX(-1)" : "scaleX(1)",
+                  }}
+                />
+                {countdown && (
+                  <div className="absolute inset-0 bg-base-100/30 backdrop-blur-sm flex items-center justify-center z-10 transition-all duration-300">
+                    <span className="text-base-content text-5xl md:text-6xl font-bold tracking-tight drop-shadow-xl animate-pulse">
+                      {countdown}
+                    </span>
+                  </div>
+                )}
+                {capturedPhotos.length > 0 && (
+                  <span className="absolute top-4 right-4 bg-base-content text-base-100 px-3 py-1 rounded-full text-xs font-semibold tracking-widest z-10 shadow-lg">
+                    {capturedPhotos.length} / {totalPhotosCount}
+                  </span>
+                )}
+
+
+
+                {/* 📸 Capture + Switch Buttons Overlay */}
+                <div className="absolute bottom-4 left-0 right-0 flex justify-center items-center gap-4 z-20">
+                  <button
+                    onClick={handleCapture}
+                    disabled={isCapturing || capturedPhotos.length >= totalPhotosCount}
+                    className="w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-primary/90 backdrop-blur-md hover:bg-primary text-primary-content shadow-[0_0_15px_rgba(0,0,0,0.3)] disabled:opacity-50 flex items-center justify-center transition-transform hover:scale-105 active:scale-95 border-2 border-white/20"
+                    title="Click Photo"
+                  >
+                    <FaCamera className="w-5 h-5 sm:w-6 sm:h-6" />
+                  </button>
+                  <button
+                    onClick={() =>
+                      setFacingMode((prev) => (prev === "front" ? "rear" : "front"))
+                    }
+                    className="w-10 h-10 rounded-full bg-base-300/60 backdrop-blur-md hover:bg-base-300/90 text-white shadow-[0_0_10px_rgba(0,0,0,0.2)] flex items-center justify-center transition-colors border border-white/10"
+                    title="Switch camera"
+                    aria-label="Switch camera"
+                  >
+                    <MdOutlineCameraswitch className="w-5 h-5" />
+                  </button>
+                </div>
+              </>
             )}
-            {capturedPhotos.length > 0 && (
-              <span className="absolute top-3 right-3 bg-yellow-400 text-black px-3 py-1 rounded-full text-xs font-bold z-10">
-                {capturedPhotos.length}/3
-              </span>
-            )}
           </div>
 
-          {/* 🎨 Filters */}
-          <div className="flex gap-2 overflow-x-auto scrollbar-hide px-1 sm:px-2 pb-2">
-            {FILTERS.map((filter) => (
-              <button
-                key={filter.name}
-                onClick={() => setCurrentFilter(filter.name)}
-                className={`px-4 py-1 rounded-full text-xs sm:text-sm whitespace-nowrap transition ${
-                  currentFilter === filter.name
-                    ? "bg-yellow-500 text-black font-semibold"
-                    : "bg-gray-200 hover:bg-gray-300 text-gray-700"
-                }`}
-              >
-                {filter.label}
-              </button>
-            ))}
-          </div>
+          {/* ⚙️ Options & 🎨 Filters */}
+          <div className="flex flex-col gap-3 w-full shrink-0">
+            {/* Number of Photos & Layout Selector */}
+            <div className="flex items-center justify-center sm:justify-start gap-4 px-2 flex-wrap">
+              
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-medium text-base-content/80">Grid size:</span>
+                <div className="flex gap-1 bg-base-200/60 p-1 rounded-full border border-base-200">
+                  {[1, 2, 3, 4].map((num) => (
+                    <button
+                      key={num}
+                      onClick={() => handleCountChange(num)}
+                      disabled={capturedPhotos.length > 0}
+                      className={`w-8 h-8 rounded-full text-sm font-bold transition-all flex items-center justify-center ${
+                        totalPhotosCount === num
+                          ? "bg-base-content text-base-100 shadow-md"
+                          : "text-base-content/70 hover:bg-base-300"
+                      } ${capturedPhotos.length > 0 ? "opacity-30 cursor-not-allowed" : ""}`}
+                      title={`${num} Photos`}
+                    >
+                      {num}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
 
-          {/* 📸 Capture + Switch Buttons */}
-          <div className="flex justify-center items-center ml-10 gap-4">
-            <button
-              onClick={handleCapture}
-              disabled={isCapturing || capturedPhotos.length >= 3}
-              className="w-16 h-16 rounded-full bg-yellow-500 hover:bg-yellow-600 text-black shadow-md disabled:opacity-50 flex items-center justify-center"
-              title="Click Photo"
-            >
-              <FaCamera className="w-6 h-6" />
-            </button>
-            <button
-              onClick={() =>
-                setFacingMode((prev) => (prev === "front" ? "rear" : "front"))
-              }
-              className="w-10 h-10 rounded-full bg-gray-200 text-black shadow hover:bg-gray-300 flex items-center justify-center"
-              title="Switch camera"
-              aria-label="Switch camera"
-            >
-              <MdOutlineCameraswitch className="w-6 h-6" />
-            </button>
+            {/* 🎨 Filters (Fixed height) */}
+            <div className="flex gap-2 overflow-x-auto scrollbar-hide py-1 px-1 w-full">
+              {FILTERS.map((filter) => (
+                <button
+                  key={filter.name}
+                  onClick={() => setCurrentFilter(filter.name)}
+                  className={`px-5 py-2 rounded-full text-xs sm:text-sm font-medium whitespace-nowrap transition-all ${
+                    currentFilter === filter.name
+                      ? "bg-base-content text-base-100 shadow-md scale-105"
+                      : "bg-base-200 hover:bg-base-300 text-base-content/70"
+                  }`}
+                >
+                  {filter.label}
+                </button>
+              ))}
+            </div>
           </div>
-
-          {/* 📝 Status */}
-          <p className="text-center text-sm text-gray-700">
-            {capturedPhotos.length === 0 && "Ready to click your first snap!"}
-            {capturedPhotos.length === 1 && "2 more to go!"}
-            {capturedPhotos.length === 2 && "One last snap!"}
-            {capturedPhotos.length === 3 && "All done! Generating collage..."}
-          </p>
         </div>
       ) : (
         // 🎞️ Photo Strip Section
-        <div className="flex flex-col-reverse md:flex-row items-center gap-6 sm:gap-8 bg-gradient-to-br from-amber-950 to-amber-800 rounded-3xl p-4 sm:p-6 md:p-8 max-w-3xl w-full shadow-xl">
-          {/* Buttons - appear below image on small screens, right side on md+ */}
-          <div className="flex flex-col gap-4 w-full md:w-auto items-center">
-            <button
-              onClick={reset}
-              className="w-full md:w-auto bg-white text-amber-900 hover:bg-gray-100 px-6 py-3 text-sm sm:text-base font-bold rounded-xl shadow-md transition-all"
-            >
-              🔄 Re-Shoot
-            </button>
+        <div className="flex flex-col md:flex-row items-start justify-center gap-8 md:gap-16 w-full max-w-6xl flex-1 px-2 md:px-8 pt-4 pb-12">
+          
+          {/* Canvas container constrained by width instead of height, allowing vertical scroll */}
+          <div className="w-full flex-1 flex justify-center items-start">
+            <canvas
+              ref={stripCanvasRef}
+              className={`w-full h-auto object-contain rounded-md shadow-2xl border-4 border-white bg-white transition-transform duration-500 ease-in-out hover:scale-[1.01] ${
+                layoutStyle === "grid" ? "max-w-xl md:max-w-2xl" : "max-w-sm md:max-w-md"
+              }`}
+            />
+          </div>
+
+          {/* Actions */}
+          <div className="flex flex-col gap-4 w-full md:w-80 sticky top-20">
+            <h3 className="text-3xl md:text-4xl font-bold tracking-tight mb-1 text-center md:text-left text-primary">Looking good!</h3>
+            <p className="text-base-content/70 font-light mb-6 text-center md:text-left">Your photo is ready to be saved and shared.</p>
+            
+            {/* Layout Style Toggle (Show on final screen for dynamic changing) */}
+            {(totalPhotosCount === 2 || totalPhotosCount === 4) && (
+              <div className="mb-4 w-full bg-base-200/50 p-3 rounded-2xl border border-base-300 shadow-sm">
+                <p className="text-sm font-semibold text-base-content/80 mb-3 text-center">Choose Layout Style</p>
+                <div className="flex gap-2 justify-center">
+                  <button
+                    onClick={() => setLayoutStyle("strip")}
+                    className={`flex-1 py-3 px-2 rounded-xl text-xs sm:text-sm font-bold transition-all flex flex-col items-center gap-2 ${
+                      layoutStyle === "strip"
+                        ? "bg-primary text-primary-content shadow-md scale-105"
+                        : "bg-base-100 text-base-content/70 hover:bg-base-200"
+                    }`}
+                  >
+                    <div className="w-5 h-8 flex flex-col gap-1">
+                      <div className="flex-1 bg-current rounded-sm opacity-50"></div>
+                      <div className="flex-1 bg-current rounded-sm opacity-50"></div>
+                    </div>
+                    Vertical Strip
+                  </button>
+                  <button
+                    onClick={() => setLayoutStyle("grid")}
+                    className={`flex-1 py-3 px-2 rounded-xl text-xs sm:text-sm font-bold transition-all flex flex-col items-center gap-2 ${
+                      layoutStyle === "grid"
+                        ? "bg-primary text-primary-content shadow-md scale-105"
+                        : "bg-base-100 text-base-content/70 hover:bg-base-200"
+                    }`}
+                  >
+                    <div className="w-8 h-8 grid grid-cols-2 gap-1">
+                      <div className="bg-current rounded-sm opacity-50"></div>
+                      <div className="bg-current rounded-sm opacity-50"></div>
+                      <div className="bg-current rounded-sm opacity-50"></div>
+                      <div className="bg-current rounded-sm opacity-50"></div>
+                    </div>
+                    Grid Style
+                  </button>
+                </div>
+              </div>
+            )}
+
             <button
               onClick={downloadStrip}
-              className="w-full md:w-auto bg-yellow-500 text-black hover:bg-yellow-400 px-6 py-3 text-sm sm:text-base font-bold rounded-xl shadow-md transition-all"
+              className="btn btn-primary rounded-full w-full h-14 text-lg font-medium shadow-lg hover:shadow-xl hover:-translate-y-1 transition-all"
             >
-              📥 Download Photo
+              Download Photo
+            </button>
+            <button
+              onClick={reset}
+              className="btn btn-outline rounded-full w-full h-14 text-lg font-medium hover:bg-base-content hover:text-base-100 transition-all"
+            >
+              Retake Photos
             </button>
           </div>
 
-          {/* Canvas strip - appears on top in mobile, left in md+ */}
-          <div className="w-full max-w-[260px] sm:max-w-[300px] md:max-w-[330px] aspect-[3/5]">
-            <canvas
-              ref={stripCanvasRef}
-              className="w-full h-auto rounded-xl shadow-lg border border-gray-300"
-            />
-          </div>
         </div>
       )}
 
