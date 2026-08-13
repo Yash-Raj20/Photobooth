@@ -392,11 +392,11 @@ export default function PhotoBoothApp() {
   };
 
   return (
-    <div className="w-full flex-1 flex flex-col items-center pb-2">
+    <div className="w-full flex-1 flex flex-col items-center pb-0 min-h-0">
       {!showPhotoStrip ? (
-        <div className="w-full flex-1 flex flex-col space-y-4 justify-between">
+        <div className="w-full flex-1 flex flex-col gap-2 md:gap-4 justify-between min-h-0 max-w-6xl mx-auto px-2 md:px-8">
           {/* 📸 Camera Preview (Responsive constraints) */}
-          <div className="relative w-full aspect-[3/4] sm:aspect-[4/3] md:aspect-video max-h-[60vh] md:max-h-[70vh] mx-auto overflow-hidden rounded-2xl bg-black border border-base-200 shadow-lg flex items-center justify-center group">
+          <div className="relative w-full shrink min-h-0 h-full max-h-[55vh] md:max-h-[65vh] mx-auto overflow-hidden rounded-2xl bg-black border border-base-200 shadow-lg flex items-center justify-center group">
             {!isCameraActive && !cameraError ? (
               <div className="absolute inset-0 bg-base-300 flex flex-col items-center justify-center p-6 text-center z-30">
                 <div className="w-20 h-20 rounded-full bg-primary/20 text-primary flex items-center justify-center mb-6">
@@ -529,55 +529,53 @@ export default function PhotoBoothApp() {
         </div>
       ) : (
         // 🎞️ Photo Strip Section
-        <div className="flex flex-col md:flex-row items-start justify-center gap-8 md:gap-16 w-full max-w-6xl flex-1 px-2 md:px-8 pt-4 pb-12">
+        <div className="flex flex-col md:flex-row items-center justify-center gap-4 md:gap-12 w-full max-w-6xl flex-1 px-2 md:px-8 py-2 min-h-0">
           
-          {/* Canvas container constrained by width instead of height, allowing vertical scroll */}
-          <div className="w-full flex-1 flex justify-center items-start">
+          {/* Canvas container constrained by height to prevent scroll */}
+          <div className="w-full flex-1 flex justify-center items-center min-h-0 h-full max-h-[55vh] md:max-h-full">
             <canvas
               ref={stripCanvasRef}
-              className={`w-full h-auto object-contain rounded-md shadow-2xl border-4 border-white bg-white transition-transform duration-500 ease-in-out hover:scale-[1.01] ${
-                layoutStyle === "grid" ? "max-w-xl md:max-w-2xl" : "max-w-sm md:max-w-md"
-              }`}
+              className="max-w-full max-h-full object-contain rounded-md shadow-2xl border-4 border-white bg-white transition-transform duration-500 ease-in-out hover:scale-[1.01]"
             />
           </div>
 
           {/* Actions */}
-          <div className="flex flex-col gap-4 w-full md:w-80 sticky top-20">
-            <h3 className="text-3xl md:text-4xl font-bold tracking-tight mb-1 text-center md:text-left text-primary">Looking good!</h3>
-            <p className="text-base-content/70 font-light mb-6 text-center md:text-left">Your photo is ready to be saved and shared.</p>
+          <div className="flex flex-col gap-3 w-full md:w-80 shrink-0 z-10 bg-base-100/80 backdrop-blur-sm md:bg-transparent p-2 md:p-0 rounded-2xl md:rounded-none">
+            <h3 className="text-2xl md:text-3xl font-bold tracking-tight mb-0 text-center md:text-left text-primary">Looking good!</h3>
+            <p className="text-sm text-base-content/70 font-light mb-2 md:mb-4 text-center md:text-left">Your photo is ready to be saved and shared.</p>
             
             {/* Layout Style Toggle (Show on final screen for dynamic changing) */}
             {(totalPhotosCount === 2 || totalPhotosCount === 4) && (
-              <div className="mb-4 w-full bg-base-200/50 p-3 rounded-2xl border border-base-300 shadow-sm">
-                <p className="text-sm font-semibold text-base-content/80 mb-3 text-center">Choose Layout Style</p>
+              <div className="mb-2 w-full bg-base-200/50 p-2 md:p-3 rounded-2xl border border-base-300 shadow-sm">
+                <p className="text-xs font-semibold text-base-content/80 mb-2 text-center">Choose Layout Style</p>
                 <div className="flex gap-2 justify-center">
                   <button
                     onClick={() => setLayoutStyle("strip")}
-                    className={`flex-1 py-3 px-2 rounded-xl text-xs sm:text-sm font-bold transition-all flex flex-col items-center gap-2 ${
+                    className={`flex-1 py-2 px-2 rounded-xl text-xs font-bold transition-all flex flex-col items-center gap-1.5 ${
                       layoutStyle === "strip"
                         ? "bg-primary text-primary-content shadow-md scale-105"
                         : "bg-base-100 text-base-content/70 hover:bg-base-200"
                     }`}
                   >
-                    <div className="w-5 h-8 flex flex-col gap-1">
-                      <div className="flex-1 bg-current rounded-sm opacity-50"></div>
-                      <div className="flex-1 bg-current rounded-sm opacity-50"></div>
+                    <div className="w-4 h-6 flex flex-col gap-0.5">
+                      <div className="flex-1 bg-current rounded-[2px] opacity-50"></div>
+                      <div className="flex-1 bg-current rounded-[2px] opacity-50"></div>
                     </div>
                     Vertical Strip
                   </button>
                   <button
                     onClick={() => setLayoutStyle("grid")}
-                    className={`flex-1 py-3 px-2 rounded-xl text-xs sm:text-sm font-bold transition-all flex flex-col items-center gap-2 ${
+                    className={`flex-1 py-2 px-2 rounded-xl text-xs font-bold transition-all flex flex-col items-center gap-1.5 ${
                       layoutStyle === "grid"
                         ? "bg-primary text-primary-content shadow-md scale-105"
                         : "bg-base-100 text-base-content/70 hover:bg-base-200"
                     }`}
                   >
-                    <div className="w-8 h-8 grid grid-cols-2 gap-1">
-                      <div className="bg-current rounded-sm opacity-50"></div>
-                      <div className="bg-current rounded-sm opacity-50"></div>
-                      <div className="bg-current rounded-sm opacity-50"></div>
-                      <div className="bg-current rounded-sm opacity-50"></div>
+                    <div className="w-6 h-6 grid grid-cols-2 gap-0.5">
+                      <div className="bg-current rounded-[2px] opacity-50"></div>
+                      <div className="bg-current rounded-[2px] opacity-50"></div>
+                      <div className="bg-current rounded-[2px] opacity-50"></div>
+                      <div className="bg-current rounded-[2px] opacity-50"></div>
                     </div>
                     Grid Style
                   </button>
@@ -587,13 +585,13 @@ export default function PhotoBoothApp() {
 
             <button
               onClick={downloadStrip}
-              className="btn btn-primary rounded-full w-full h-14 text-lg font-medium shadow-lg hover:shadow-xl hover:-translate-y-1 transition-all"
+              className="btn btn-primary rounded-full w-full h-12 md:h-14 text-base md:text-lg font-medium shadow-lg hover:shadow-xl hover:-translate-y-1 transition-all"
             >
               Download Photo
             </button>
             <button
               onClick={reset}
-              className="btn btn-outline rounded-full w-full h-14 text-lg font-medium hover:bg-base-content hover:text-base-100 transition-all"
+              className="btn btn-outline rounded-full w-full h-12 md:h-14 text-base md:text-lg font-medium hover:bg-base-content hover:text-base-100 transition-all"
             >
               Retake Photos
             </button>
