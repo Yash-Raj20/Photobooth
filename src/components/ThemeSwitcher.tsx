@@ -5,7 +5,7 @@ import { useEffect, useState } from "react"
 const themes = ["light", "dark", "cupcake", "synthwave", "retro", "cyberpunk", "coffee"]
 
 export default function ThemeSwitcher() {
-  const [theme, setTheme] = useState("cupcake")
+  const [theme, setTheme] = useState("coffee")
 
   // Load theme from localStorage on mount
   useEffect(() => {
